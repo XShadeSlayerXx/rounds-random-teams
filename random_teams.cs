@@ -1,15 +1,12 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
 using Photon.Pun;
 using RWF;
 using RWF.UI;
-using UnboundLib.Extensions;
 using UnityEngine;
 using UnityEngine.Experimental.PlayerLoop;
-using RWF.Patches;
 
 namespace random_teams;
 
@@ -27,20 +24,6 @@ public class RandomTeams : BaseUnityPlugin
         harmony.PatchAll();
     }
 
-    //[HarmonyPatch(typeof(PrivateRoomCharacterSelectionInstance), "RPCA_ChangeTeam")]
-    //class RPC_Hijack_Path
-    //{
-    //    static bool Prefix(ref PrivateRoomCharacterSelectionInstance __instance, int newColorID)
-    //    {
-    //        if (newColorID < 0)
-    //        {
-    //            __instance.UpdateFaceColors();
-    //            return false;
-    //        }
-    //        return true;
-    //    }
-    //}
-
     [HarmonyPatch(typeof(PrivateRoomCharacterSelectionInstance), "RPCO_SelectFace")]
     class RPC_Hijack_Patch
     {
@@ -54,48 +37,14 @@ public class RandomTeams : BaseUnityPlugin
             if (__instance.currentPlayer.uniqueID != faceID) return false; //discard, not meant for us
             Logger.LogInfo("----passed the actorID check");
             Logger.LogInfo("----NetAct: " + PhotonNetwork.LocalPlayer.ActorNumber + ", _instAct: " + __instance.currentPlayer.actorID + ", passedID: " + faceID);
-            //var tmp_actor = PhotonNetwork.LocalPlayer.ActorNumber;
-            //__instance.currentPlayer.actorID = PhotonNetwork.LocalPlayer.ActorNumber;
-            //PhotonView view = __instance.gameObject.GetComponent<PhotonView>();
-            //view.RPC("RPCA_ChangeTeam", RpcTarget.All, eyeID);
 
-            ChangeTeam_Override(ref __instance, faceID, eyeID);
-            //ChangeTeam_Override(faceID, eyeID);
-            //if (__instance.currentPlayer.uniqueID == faceID)
-            //{
-
-            //}
-
-            //__instance.UpdateFaceColors();
+            ChangeTeam_Override(ref __instance, eyeID);
             return false;
         }
     }
 
-    //[PunRPC]
-    //public static void ChangeTeam_Override(int uniqueID, int newColorID)
-    //{
-    //    //Logger.LogInfo("Recieved a RPCO_ChangeTeam, with faceID: " + uniqueID + ", colorID: " + newColorID);
-    //    LobbyCharacter[] characters = PhotonNetwork.CurrentRoom.Players.Values.ToList().Select(p => p.GetProperty<LobbyCharacter[]>("players")).SelectMany(p => p).Where(p => p != null).ToArray();
-    //    LobbyCharacter who = characters.Where(p => p.uniqueID == uniqueID).FirstOrDefault();
-    //    who.colorID = newColorID;
-    //    characters[who.localID] = who;
-    //    PhotonNetwork.LocalPlayer.SetProperty("players", characters);
-    //}
-    //[PunRPC]
-    //public void RPCNew_ChangeTeam(int uniqueID, int newColorID)
-    //{
-    //    Logger.LogInfo("Recieved a RPCO_ChangeTeam, with faceID: " + uniqueID + ", colorID: " + newColorID);
-    //    LobbyCharacter[] characters = PhotonNetwork.CurrentRoom.Players.Values.ToList().Select(p => p.GetProperty<LobbyCharacter[]>("players")).SelectMany(p => p).Where(p => p != null).ToArray();
-    //    LobbyCharacter who = characters.Where(p => p.uniqueID == uniqueID).FirstOrDefault();
-    //    who.colorID = newColorID;
-    //    characters[who.localID] = who;
-    //    PhotonNetwork.LocalPlayer.SetProperty("players", characters);
-    //}
-
-    //[PunRPC]
-    public static void ChangeTeam_Override(ref PrivateRoomCharacterSelectionInstance instance, int uniqueID, int newColorID)
+    public static void ChangeTeam_Override(ref PrivateRoomCharacterSelectionInstance instance, int newColorID)
     {
-        //if (uniqueID != __instance.uniqueID) return; //not directed at us
         //__instance.lastChangedTeams = Time.realtimeSinceStartup;
         Traverse.Create(instance).Field("lastChangedTeams").SetValue(Time.realtimeSinceStartup);
 
@@ -161,10 +110,7 @@ public class RandomTeams : BaseUnityPlugin
                     }
                     character.colorID = color;
                     Logger.LogInfo("Randomized " + character.actorID + " to: " + character.colorID);
-                    //object[] test = { character.uniqueID, character.colorID };
                     object[] test = { character.uniqueID, character.colorID, v_zero, zero, v_zero, zero, v_zero, zero, v_zero };
-                    //traverse.Property("view").Method("RPC", nameof(PrivateRoomInstance_Extensions.ChangeTeamRPC), RpcTarget.All, test);
-                    //view.RPC(nameof(RPCNew_ChangeTeam), RpcTarget.All, test);
                     view.RPC("RPCO_SelectFace", RpcTarget.All, test);
                 }
 
@@ -176,22 +122,15 @@ public class RandomTeams : BaseUnityPlugin
             else if (Input.GetKeyDown(KeyCode.Alpha0))
             {
                 PhotonView view = __instance.gameObject.GetComponent<PhotonView>();
-                //LobbyCharacter[] characters = PhotonNetwork.LocalPlayer.GetProperty<LobbyCharacter[]>("players").Where(p => p != null).ToArray();
                 LobbyCharacter[] characters = PhotonNetwork.CurrentRoom.Players.Values.ToList().Select(p => p.GetProperty<LobbyCharacter[]>("players")).SelectMany(p => p).Where(p => p != null).ToArray();
-                //LobbyCharacter[] characters = PhotonNetwork.LocalPlayer.GetProperty<LobbyCharacter[]>("players");
 
                 foreach (var character in characters)
                 {
-                    //if (character == null) continue;
                     int random_color = UnityEngine.Random.RandomRangeInt(0, RWFMod.MaxColorsHardLimit);
                     character.colorID = random_color;
                     Logger.LogWarning("Randomized " + character.actorID + " to: " + random_color);
-                    //int converted_actorID = -character.actorID - 1;
-                    //object[] test = { character.uniqueID, random_color };
                     object[] test = { character.uniqueID, random_color, v_zero, zero, v_zero, zero, v_zero, zero, v_zero };
-                    //view.RPC(nameof(RPCNew_ChangeTeam), RpcTarget.All, test);
                     view.RPC("RPCO_SelectFace", RpcTarget.All, test);
-                    //NetworkingManager.RPC(typeof(Unbound_RPC_test), "ChangeToColorRequest", character.uniqueID, random_color);
 
                 }
 
@@ -199,34 +138,6 @@ public class RandomTeams : BaseUnityPlugin
                 //view.RPC("RPCA_ChangeTeam", RpcTarget.All, -1);
                 //__instance.UpdateFaceColors();
             }
-            ////need to cause a nullref to regenerate stuff for my debugger >:(
-            //else if (Input.GetKeyDown(KeyCode.Alpha9))
-            //{
-            //    PhotonView view = __instance.gameObject.GetComponent<PhotonView>();
-            //    //no check here on purpose for the nullref
-            //    LobbyCharacter[] characters = PhotonNetwork.LocalPlayer.GetProperty<LobbyCharacter[]>("players");
-            //    foreach (var character in characters)
-            //    {
-            //        character.colorID = UnityEngine.Random.RandomRangeInt(0, RWFMod.MaxColorsHardLimit);
-            //        Logger.LogInfo("Randomized " + character.actorID + " to: " + character.colorID);
-
-            //        object[] test = { character.uniqueID, character.colorID, v_zero, zero, v_zero, zero, v_zero, zero, v_zero };
-            //        //view.RPC(nameof(RPCNew_ChangeTeam), RpcTarget.All, test);
-            //        view.RPC("RPCO_SelectFace", RpcTarget.All, test);
-            //    }
-            //    var nullref = characters[999];
-            //}
         }
     }
 }
-
-//public static class Unbound_RPC_test
-//{
-//    [UnboundLib.Networking.UnboundRPC]
-//    public static void ChangeToColorRequest(this PrivateRoomCharacterSelectionInstance instance, int uniqueID, int colorID)
-//    {
-//        if (instance.uniqueID != uniqueID) { return; }
-//        PhotonView view = instance.gameObject.GetComponent<PhotonView>();
-//        view.RPC("RPCA_ChangeTeam", RpcTarget.All, colorID);
-//    }
-//}
